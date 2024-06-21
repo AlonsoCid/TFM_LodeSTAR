@@ -5,7 +5,7 @@ from deeptrack.backend.units import ConversionTable
 from deeptrack.types import PropertyLike
 from deeptrack import units as u
 
-class StarSquare(Scatterer):
+class Star(Scatterer):
     """Generates a square scatterer with extended corners like a 4-corner star.
 
     Parameters

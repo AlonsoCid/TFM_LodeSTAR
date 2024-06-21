@@ -5,7 +5,7 @@ from deeptrack.backend.units import ConversionTable
 from deeptrack.types import PropertyLike
 from deeptrack import units as u
 
-class CrescentMoon(Scatterer):
+class Moon(Scatterer):
     __conversion_table__ = ConversionTable(
         size=(u.meter, u.meter),
         rotation=(u.radian, u.radian),
