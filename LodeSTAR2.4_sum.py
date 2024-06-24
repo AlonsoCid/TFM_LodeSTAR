@@ -81,9 +81,6 @@ class LodeSTAR(Application):
         if self.training:
             x, class_label = x
 
-        # else:
-        #     x, _, _ = x
-
         out = self.model(x)
         y = out[:, :3, ...]
         classes=out[:, 3:, ...]
@@ -160,8 +157,7 @@ class LodeSTAR(Application):
         compl_mask=classes[:,:-1,...].sum(dim=1)[:,None]-mask_gumbel
         mask_loss = 10*compl_mask.mean(dim=(2, 3)).mean()
 
-        #pixel_sum_loss = 1-torch-sum(mask_gumbel)
-        current_ratio = torch.sum(mask_gumbel) / mask_gumbel.numel() # This normalize the value avaoiding of the loss, otherwise it will be too high
+        current_ratio = torch.sum(mask_gumbel) / mask_gumbel.numel() # I have ormalize the loss, otherwise it will be too high
         pixel_sum_loss = 1*(1 - current_ratio)
 
         return {

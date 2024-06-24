@@ -54,6 +54,7 @@ def segmentation_tests(test_dataset, model_output):
     positions = [item[-n_classes:] for item in test_dataset]
     positions = [torch.stack(item) for item in positions]
     positions = torch.stack(positions)
+    positions = positions / 2
 
     # Downsize the image to 48x48
     reduced_images = F.interpolate(sim, size=(48, 48), mode='bilinear', align_corners=False)
@@ -67,7 +68,7 @@ def segmentation_tests(test_dataset, model_output):
         plt.subplot(2, 4, i + 1)
         plt.imshow(reduced_images[0,i].squeeze(), cmap="gray", origin="lower")
         plt.imshow(mask[0,i].squeeze(), cmap="jet", alpha=0.5, origin="lower")
-        plt.scatter(positions[0][i][1]/2, positions[0][i][0]/2, c="r")
+        # plt.scatter(positions[0][i][1], positions[0][i][0], c="r")
     plt.tight_layout()
     plt.show()
 

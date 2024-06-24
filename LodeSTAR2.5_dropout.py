@@ -81,9 +81,6 @@ class LodeSTAR(Application):
         if self.training:
             x, class_label = x
 
-        # else:
-        #     x, _, _ = x
-
         out = self.model(x)
         y = out[:, :3, ...]
         classes=out[:, 3:, ...]
