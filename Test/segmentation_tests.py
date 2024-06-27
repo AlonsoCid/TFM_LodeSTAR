@@ -16,7 +16,7 @@ def segmentation_tests(test_dataset, model_output):
     #     percentage_matches = (matches / target.size(0)) * 100
     #     return percentage_matches
 
-    def recall_and_false_positives(mask, position):
+    def true_positives_and_false_positives(mask, position):
         true_positives = 0
         artifacts = 0
     
@@ -74,7 +74,7 @@ def segmentation_tests(test_dataset, model_output):
 
     for i in range(n_classes):
         print(f"Class {i+1}:")
-        recall_score, fp_count = recall_and_false_positives(mask[:,i], positions[:,i])
+        recall_score, fp_count = true_positives_and_false_positives(mask[:,i], positions[:,i])
         print(f"Jaccard Index: {jaccard_index(reduced_images[:, i], mask[:, i]):.4f}")
-        print(f"Recall %: {recall_score:.0f}%")
-        print(f"Average number of artifacts: {fp_count}")
+        print(f"True positives %: {recall_score:.0f}%")
+        print(f"False positives: {fp_count}")
