@@ -6,7 +6,7 @@ from deeptrack.types import PropertyLike
 from deeptrack import units as u
 
 class Star(Scatterer):
-    """Generates a square scatterer with extended corners like a 4-corner star.
+    """Generates a square with extended corners like a 4-corner star.
 
     Parameters
     ----------

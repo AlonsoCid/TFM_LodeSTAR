@@ -1,9 +1,9 @@
 import torch
 
-def get_euclidean_distance(test_dataset, detect_results, model_output):
+def get_euclidean_distance(test_dataset, detect_results, model_output, n_classes):
 
     # Get segmentation masks
-    n_classes = model_output.size(1)-5
+    # n_classes = model_output.size(1)-6
     mask = model_output[:, 4:n_classes+4]
 
     # Get gt positions

@@ -4,11 +4,17 @@ import matplotlib.pyplot as plt
 from scipy import ndimage
 
 def segmentation_tests(test_dataset, model_output):
-    def jaccard_index(target, pred, smooth=1e-10):
-        intersection = (pred.int() & target.int()).sum((1))
-        union = (pred.int() | target.int()).sum((1))
-        iou = (intersection + smooth) / (union + smooth)
+    def jaccard_index(tensor1, tensor2):
+        intersection = torch.logical_and(tensor1, tensor2).sum()
+        union = torch.logical_or(tensor1, tensor2).sum()
+        iou = intersection.float() / union.float()
         return iou.mean()
+
+    # def jaccard_index(target, pred, smooth=1e-10):
+    #     intersection = (pred.int() & target.int()).sum((1))
+    #     union = (pred.int() | target.int()).sum((1))
+    #     iou = (intersection + smooth) / (union + smooth)
+    #     return iou.mean()
 
     # def recall(target, pred): # This one check for ground truth and mask overlaping, the new one uses positions which is more accurate and we need it for multiple object detection
     #     intersection = (target == 1) & (pred == 1)

@@ -180,14 +180,101 @@ class LodeSTAR(Application):
             score as threshhold. If constant, the cutoff is used directly as treshhold.
         """
         y = self(x.to(self.device))
-        y_pred, weights, mask_gumbel = y[:, :2], y[:, 2:3], y[:, 3:4]
-        detections = [
-            self.detect_single(y_pred[i], weights[i], mask_gumbel[i], alpha, beta, cutoff, mode)
-            for i in range(len(y_pred))
-        ]
-        
-        detections = [row[::-1] for row in detections]
+        y_pred, weights, mask_gumbel = y[:, :2], y[:, 2:3], y[:, 4:4+self.num_classes]
+
+        detections = []
+        for i in range(len(y_pred)):
+            sample_detections = []
+            for j in range(self.num_classes):
+                mask = mask_gumbel[:, j:j+1, :, :] #* weights
+                detection = self.detect_single(y_pred[i], mask[i], alpha, beta, cutoff, mode)
+                sample_detections.append(detection)
+            
+            # Convert the list of arrays to a single 2D array
+            sample_detections = np.vstack(sample_detections)
+            detections.append(sample_detections)
+
         return detections
+    
+    def detect_single(
+        self, y_pred, weights, alpha=0.5, beta=0.5, cutoff=0.97, mode="quantile"
+    ):
+        """Detects objects in a single image
+
+        Parameters
+        ----------
+        y_pred, weights: array-like
+            Output from model
+        alpha, beta: float
+            Geometric weight of the weight-map vs the consistenct metric for detection.
+        cutoff: float
+            Threshold for detection
+        mode: string
+            Mode for thresholding. Can be either "quantile" or "ratio" or "constant". If "quantile", then
+            `ratio` defines the quantile of scores to accept. If "ratio", then cutoff defines the ratio of the max
+            score as threshhold. If constant, the cutoff is used directly as treshhold.
+        """
+        score = self.get_detection_score(y_pred, weights, alpha, beta)
+        return self.find_local_maxima(y_pred, score, cutoff, mode)
+    
+    @classmethod
+    def get_detection_score(cls, pred, weights, alpha=0.5, beta=0.5):
+        """Calculates the detection score as weights^alpha * consistency^beta.
+
+        Parameters
+        ----------
+        pred, weights: array-like
+            Output from model
+        alpha, beta: float
+            Geometric weight of the weight-map vs the consistenct metric for detection.
+        """
+        return (
+            weights[0].detach().cpu().numpy() ** alpha
+            * cls.local_consistency(pred) ** beta
+        )
+    
+    @staticmethod
+    def local_consistency(pred):
+        """Calculate the consistency metric
+
+        Parameters
+        ----------
+        pred : array-like
+            first output from model
+        """
+        pred = pred.permute(1, 2, 0).cpu().detach().numpy()
+        kernel = np.ones((3, 3, 1)) / 3**2
+        pred_local_squared = scipy.signal.convolve(pred, kernel, "same") ** 2
+        squared_pred_local = scipy.signal.convolve(pred**2, kernel, "same")
+        squared_diff = (squared_pred_local - pred_local_squared).sum(-1)
+        np.clip(squared_diff, 0, np.inf, squared_diff)
+        return 1 / (1e-6 + squared_diff)
+    
+    @staticmethod
+    def find_local_maxima(pred, score, cutoff=0.9, mode="quantile"):
+        """Finds the local maxima in a score-map, indicating detections
+
+        Parameters
+            ----------
+        pred, score: array-like
+            Output from model, score-map
+        cutoff, mode: float, string
+            Treshholding parameters. Mode can be either "quantile" or "ratio" or "constant". If "quantile", then
+            `ratio` defines the quantile of scores to accept. If "ratio", then cutoff defines the ratio of the max
+            score as threshhold. If constant, the cutoff is used directly as treshhold.
+
+        """
+        score = score[3:-3, 3:-3]
+        th = cutoff
+        if mode == "quantile":
+            th = np.quantile(score, cutoff)
+        elif mode == "ratio":
+            th = np.max(score.flatten()) * cutoff
+        th += 1e-6 # to avoid h = 0 error
+        hmax = morphology.h_maxima(np.squeeze(score), th) == 1
+        hmax = np.pad(hmax, ((3, 3), (3, 3)))
+        detections = pred.permute(1, 2, 0).detach().cpu().numpy()[hmax, :]
+        return np.array(detections)
 
     def pooled(self, x, mask=1):
         """Pooled output from model.
@@ -209,86 +296,6 @@ class LodeSTAR(Application):
         pooled = self.reduce(y_pred, self.normalize(masked_weights))
 
         return pooled
-
-    def detect_single(
-        self, y_pred, weights, mask_gumbel, alpha=0.5, beta=0.5, cutoff=0.97, mode="quantile"
-    ):
-        """Detects objects in a single image
-
-        Parameters
-        ----------
-        y_pred, weights: array-like
-            Output from model
-        alpha, beta: float
-            Geometric weight of the weight-map vs the consistenct metric for detection.
-        cutoff: float
-            Threshold for detection
-        mode: string
-            Mode for thresholding. Can be either "quantile" or "ratio" or "constant". If "quantile", then
-            `ratio` defines the quantile of scores to accept. If "ratio", then cutoff defines the ratio of the max
-            score as threshhold. If constant, the cutoff is used directly as treshhold.
-        """
-        score = self.get_detection_score(y_pred, weights, mask_gumbel, alpha, beta)
-        return self.find_local_maxima(y_pred, score, cutoff, mode)
-
-    @staticmethod
-    def find_local_maxima(pred, score, cutoff=0.9, mode="quantile"):
-        """Finds the local maxima in a score-map, indicating detections
-
-        Parameters
-            ----------
-        pred, score: array-like
-            Output from model, score-map
-        cutoff, mode: float, string
-            Treshholding parameters. Mode can be either "quantile" or "ratio" or "constant". If "quantile", then
-            `ratio` defines the quantile of scores to accept. If "ratio", then cutoff defines the ratio of the max
-            score as threshhold. If constant, the cutoff is used directly as treshhold.
-
-        """
-        score = score[3:-3, 3:-3]
-        th = cutoff
-        if mode == "quantile":
-            th = np.quantile(score, cutoff)
-        elif mode == "ratio":
-            th = np.max(score.flatten()) * cutoff
-        hmax = morphology.h_maxima(np.squeeze(score), th) == 1
-        hmax = np.pad(hmax, ((3, 3), (3, 3)))
-        detections = pred.permute(1, 2, 0).detach().cpu().numpy()[hmax, :]
-        return np.array(detections)
-
-    @staticmethod
-    def local_consistency(pred):
-        """Calculate the consistency metric
-
-        Parameters
-        ----------
-        pred : array-like
-            first output from model
-        """
-        pred = pred.permute(1, 2, 0).cpu().detach().numpy()
-        kernel = np.ones((3, 3, 1)) / 3**2
-        pred_local_squared = scipy.signal.convolve(pred, kernel, "same") ** 2
-        squared_pred_local = scipy.signal.convolve(pred**2, kernel, "same")
-        squared_diff = (squared_pred_local - pred_local_squared).sum(-1)
-        np.clip(squared_diff, 0, np.inf, squared_diff)
-        return 1 / (1e-6 + squared_diff)
-
-    @classmethod
-    def get_detection_score(cls, pred, weights, mask_gumbel, alpha=0.5, beta=0.5):
-        """Calculates the detection score as weights^alpha * consistency^beta.
-
-        Parameters
-        ----------
-        pred, weights: array-like
-            Output from model
-        alpha, beta: float
-            Geometric weight of the weight-map vs the consistenct metric for detection.
-        """
-        return (
-            weights[0].detach().cpu().numpy() ** alpha
-            * mask_gumbel[0].detach().cpu().numpy() ** alpha
-            * cls.local_consistency(pred) ** beta
-        )
 
     def train_preprocess(self, batch):
         batch, class_label = batch
