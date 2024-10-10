@@ -157,7 +157,7 @@ class LodeSTAR(Application):
         compl_mask=classes[:,:-1,...].sum(dim=1)[:,None]-mask_gumbel
         mask_loss = 10*compl_mask.mean(dim=(2, 3)).mean()
 
-        current_ratio = torch.sum(mask_gumbel) / mask_gumbel.numel() # I have ormalize the loss, otherwise it will be too high
+        current_ratio = torch.sum(mask_gumbel) / mask_gumbel.numel() # Normalize loss, otherwise it will be too high
         pixel_sum_loss = 1*(1 - current_ratio)
 
         return {
