@@ -1,0 +1,1 @@
+This repository contains the code and experiments developed for my Master’s thesis on machine learning and computer vision for high-throughput microscopy image analysis, with a focus on automatic image segmentation and multi-class classification. The full thesis document, including methodology and results, is available as Thesis_Alonso_Cid.pdf.
